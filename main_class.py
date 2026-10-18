@@ -8,7 +8,7 @@ class polska_gurom(object):
         self.biases = [np.random.randn(y, 1) for y in sizes[1:]]
         self.weights = [np.random.randn(y, x) for x, y in zip(sizes[:-1], sizes[1:])]
 
-    def feedforward(self, x):
+    def feedforward(self, x:np.ndarray) -> np.ndarray:
         """
         Computes the feedforward pass of the neural network for a single input vector.
 
@@ -33,7 +33,7 @@ class polska_gurom(object):
             
         return input
 
-    def result_test_data(self, data):
+    def result_test_data(self, data) -> int:
         """
         Evaluates the neural network on a test dataset and returns the number of correct predictions.
 
