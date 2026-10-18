@@ -1,6 +1,6 @@
 import numpy as np
 
-def sigmoid_function(x):
+def sigmoid_function(x:float | np.ndarray) -> float | np.ndarray:
     """
     Computes the sigmoid activation function.
     
@@ -12,7 +12,7 @@ def sigmoid_function(x):
     """
     return 1/(1 + np.exp(-x))
 
-def sigmoid_derivative(x):
+def sigmoid_derivative(x:float | np.ndarray) -> float | np.ndarray:
     """
     Computes the derivative of the sigmoid function.
     
