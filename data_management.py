@@ -1,17 +1,21 @@
-import numpy as np
+import random
 
-def batch_split(data:np.ndarray, batch_size:int) -> np.ndarray:
+def batch_split(training_data: list, mini_batch_size: int = 10) -> list:
     """
-    Splits the data into batches of specified size.
+    Shuffles the training data and splits it into mini-batches.
 
     Parameters:
-    data (np.ndarray): The input data to be split into batches.
-    batch_size (int): The size of each batch.
+    training_data (list): A list of tuples (x, y), where 'x' is the input column vector and 'y' is the desired output.
+    mini_batch_size (int): Number of examples per mini-batch (the last one may be smaller).
 
     Returns:
-    np.ndarray: An array of batches, where each batch is a list of data items.
+    list: A list of mini-batches, each a list of (x, y) tuples.
     """
-    batches = np.ndarray([data[i:i + batch_size] for i in range(0, len(data), batch_size)])
-    np.shuffle(batches)
-    
-    return batches
+
+    if mini_batch_size <= 0:
+        raise ValueError("mini_batch_size must be positive")
+
+    data = list(training_data)
+    random.shuffle(data)
+
+    return [data[k:k + mini_batch_size] for k in range(0, len(data), mini_batch_size)]
