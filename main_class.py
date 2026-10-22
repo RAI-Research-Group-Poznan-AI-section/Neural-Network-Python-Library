@@ -1,3 +1,5 @@
+from random import random
+
 import numpy as np
 from mathematic_functions import *
 
@@ -68,6 +70,53 @@ class polska_gurom(object):
                 raise RuntimeError(f"Error processing test sample: {e}")
                 
         return counter
+
+    def update_mini_batch(self, mini_batch: list, eta: float) -> tuple:
+        """
+        Updates the network's weights and biases by applying gradient descent
+        using backpropagation to a single mini-batch.
+
+        Parameters:
+        mini_batch (list): A list of tuples (x, y), where 'x' is the input column vector and 'y' is the desired output.
+        eta (float): The learning rate.
+
+        Returns:
+        tuple: Updated weights and biases after applying gradient descent.
+        """
+
+        # Initialize gradients for weights and biases
+        nabla_w = [np.zeros(w.shape) for w in self.weights]
+        nabla_b = [np.zeros(b.shape) for b in self.biases]
+
+        # Perform backpropagation for each example in the mini-batch
+        for x, y in mini_batch:
+            delta_nabla_w, delta_nabla_b = self.backprop(x, y)
+            nabla_w = [nw + dnw for nw, dnw in zip(nabla_w, delta_nabla_w)]
+            nabla_b = [nb + dnb for nb, dnb in zip(nabla_b, delta_nabla_b)]
+
+        # Update weights and biases using the average gradients
+        self.weights = [w - (eta / len(mini_batch)) * nw for w, nw in zip(self.weights, nabla_w)]
+        self.biases = [b - (eta / len(mini_batch)) * nb for b, nb in zip(self.biases, nabla_b)]
+
+    def batch_split(training_data: list, mini_batch_size: int = 10) -> list:
+        """
+        Shuffles the training data and splits it into mini-batches.
+
+        Parameters:
+        training_data (list): A list of tuples (x, y), where 'x' is the input column vector and 'y' is the desired output.
+        mini_batch_size (int): Number of examples per mini-batch (the last one may be smaller).
+
+        Returns:
+        list: A list of mini-batches, each a list of (x, y) tuples.
+        """
+
+        if mini_batch_size <= 0:
+            raise ValueError("mini_batch_size must be positive")
+
+        data = list(training_data)
+        random.shuffle(data)
+
+        return [data[k:k + mini_batch_size] for k in range(0, len(data), mini_batch_size)]
     
     def backprop(self, x: np.ndarray, y: np.ndarray) -> tuple[list[np.ndarray], list[np.ndarray]]:
             """
