@@ -117,3 +117,45 @@ class polska_gurom(object):
         random.shuffle(data)
 
         return [data[k:k + mini_batch_size] for k in range(0, len(data), mini_batch_size)]
+    
+    def backprop(self, x: np.ndarray, y: np.ndarray) -> tuple[list[np.ndarray], list[np.ndarray]]:
+            """
+            Parameters:
+            x (np.ndarray) - An array of the activations for the input of the network
+            y (np.ndarray) - An array with outputs for x
+            
+            Returns: 
+            tuple: A tuple containing two lists of np.ndarray, the gradients.
+            
+            Raises:
+            ValueError: If the input 'x' or 'y' does not match the expected input layer dimensions.
+            """
+            
+            if x.shape != (self.sizes[0], 1):
+                raise ValueError(f"Input 'x' must have shape ({self.sizes[0]}, 1), got {x.shape}")
+            if y.shape != (self.sizes[-1], 1):
+                raise ValueError(f"Target 'y' must have shape ({self.sizes[-1]}, 1), got {y.shape}")
+            
+            grad_w = [np.zeros(w.shape) for w in self.weights]
+            grad_b = [np.zeros(b.shape) for b in self.biases]
+            
+            input = x 
+            activations = [x]
+            zs = []
+            
+            for w, b in zip(self.weights, self.biases):
+                z = np.dot(w, input) + b
+                zs.append(z)
+                input = sigmoid_function(z)
+                activations.append(input)
+            
+            error = cost_function_derivative(activations[-1], y) * sigmoid_derivative(sigmoid_function(zs[-1]))
+            grad_b[-1] = error
+            grad_w[-1] = np.dot(error, activations[-2].T)
+            
+            for l in range(2, self.num_layers):
+                error = np.dot(self.weights[-l+1].T, error) * sigmoid_derivative(sigmoid_function(zs[-l]))
+                grad_b[-l] = error
+                grad_w[-l] = np.dot(error, activations[-l-1].T)
+            
+            return (grad_b, grad_w)
