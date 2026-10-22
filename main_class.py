@@ -119,43 +119,83 @@ class polska_gurom(object):
         return [data[k:k + mini_batch_size] for k in range(0, len(data), mini_batch_size)]
     
     def backprop(self, x: np.ndarray, y: np.ndarray) -> tuple[list[np.ndarray], list[np.ndarray]]:
-            """
-            Parameters:
-            x (np.ndarray) - An array of the activations for the input of the network
-            y (np.ndarray) - An array with outputs for x
+        """
+        Parameters:
+        x (np.ndarray) - An array of the activations for the input of the network
+        y (np.ndarray) - An array with outputs for x
+        
+        Returns: 
+        tuple: A tuple containing two lists of np.ndarray, the gradients.
+        
+        Raises:
+        ValueError: If the input 'x' or 'y' does not match the expected input layer dimensions.
+        """
+        
+        if x.shape != (self.sizes[0], 1):
+            raise ValueError(f"Input 'x' must have shape ({self.sizes[0]}, 1), got {x.shape}")
+        if y.shape != (self.sizes[-1], 1):
+            raise ValueError(f"Target 'y' must have shape ({self.sizes[-1]}, 1), got {y.shape}")
+        
+        grad_w = [np.zeros(w.shape) for w in self.weights]
+        grad_b = [np.zeros(b.shape) for b in self.biases]
+        
+        input = x 
+        activations = [x]
+        zs = []
+        
+        for w, b in zip(self.weights, self.biases):
+            z = np.dot(w, input) + b
+            zs.append(z)
+            input = sigmoid_function(z)
+            activations.append(input)
+        
+        error = cost_function_derivative(activations[-1], y) * sigmoid_derivative(sigmoid_function(zs[-1]))
+        grad_b[-1] = error
+        grad_w[-1] = np.dot(error, activations[-2].T)
+        
+        for l in range(2, self.num_layers):
+            error = np.dot(self.weights[-l+1].T, error) * sigmoid_derivative(sigmoid_function(zs[-l]))
+            grad_b[-l] = error
+            grad_w[-l] = np.dot(error, activations[-l-1].T)
+        
+        return (grad_b, grad_w)
+
+    def train(self, training_data: list[tuple[np.ndarray,np.ndarray]], epochs: int, batch_size: int, learning_rate: float, test_data: list[tuple[np.ndarray, int]] = None):
+        """
+
+        Parameters:
+            training_data (list[tuple[np.ndarray,np.ndarray]]): A list of tuples (x, y), where 'x' is the input column vector and 'y' is the desired output.
+            epochs (int): Number of epochs for how long the training must go.
+            batch_size (int): Size of the mini batches.
+            learning_rate (float): Learning rate
+            test_data (list[tuple[np.ndarray, int]], optional): A list of tuples (x, y), where 'x' is the input column vector and 'y' is the desired output.
+            It is used to compare the training results with the correct ones. Using it slows down the algorithm. Defaults to None.
+        
+        Raises:
+            ValueError: If the input 'training_data' is empty.
+            ValueError: If the number of epochs is less or equal than 0.
+            ValueError: If the value of the learning rate is less than zero.
+        """
+        
+        if not training_data:
+            raise ValueError("Training Data shouldn't be empty")
+        if epochs <= 0:
+            raise ValueError(f"Epochs must be an integer greater than 0, got {epochs}")
+        if learning_rate <= 0:
+            raise ValueError(f"Learning rate must be greater than 0, got {learning_rate}")
+        
+        if test_data:
+            n_test = len(test_data)
+        n = len(training_data)
+        
+        
+        for i in range(epochs):
             
-            Returns: 
-            tuple: A tuple containing two lists of np.ndarray, the gradients.
+            batches = self.batch_split(training_data, batch_size)    
+            for batch in batches:
+                self.update_mini_batch(batch, learning_rate)
             
-            Raises:
-            ValueError: If the input 'x' or 'y' does not match the expected input layer dimensions.
-            """
-            
-            if x.shape != (self.sizes[0], 1):
-                raise ValueError(f"Input 'x' must have shape ({self.sizes[0]}, 1), got {x.shape}")
-            if y.shape != (self.sizes[-1], 1):
-                raise ValueError(f"Target 'y' must have shape ({self.sizes[-1]}, 1), got {y.shape}")
-            
-            grad_w = [np.zeros(w.shape) for w in self.weights]
-            grad_b = [np.zeros(b.shape) for b in self.biases]
-            
-            input = x 
-            activations = [x]
-            zs = []
-            
-            for w, b in zip(self.weights, self.biases):
-                z = np.dot(w, input) + b
-                zs.append(z)
-                input = sigmoid_function(z)
-                activations.append(input)
-            
-            error = cost_function_derivative(activations[-1], y) * sigmoid_derivative(sigmoid_function(zs[-1]))
-            grad_b[-1] = error
-            grad_w[-1] = np.dot(error, activations[-2].T)
-            
-            for l in range(2, self.num_layers):
-                error = np.dot(self.weights[-l+1].T, error) * sigmoid_derivative(sigmoid_function(zs[-l]))
-                grad_b[-l] = error
-                grad_w[-l] = np.dot(error, activations[-l-1].T)
-            
-            return (grad_b, grad_w)
+            if test_data:
+                print(f"Epoch {i}: {self.result_test_data(test_data)} / {n_test}")
+            else:
+                print(f"Epoch {i} completed")
