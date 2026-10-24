@@ -90,7 +90,7 @@ class polska_gurom(object):
 
         # Perform backpropagation for each example in the mini-batch
         for x, y in mini_batch:
-            delta_nabla_w, delta_nabla_b = self.backprop(x, y)
+            delta_nabla_b, delta_nabla_w = self.backprop(x, y)
             nabla_w = [nw + dnw for nw, dnw in zip(nabla_w, delta_nabla_w)]
             nabla_b = [nb + dnb for nb, dnb in zip(nabla_b, delta_nabla_b)]
 
