@@ -179,3 +179,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# files for testing
+.png
+.jpg
+.bml
+.txt
+.csv
+.jpeg
