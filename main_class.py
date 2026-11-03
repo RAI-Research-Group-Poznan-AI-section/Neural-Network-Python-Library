@@ -1,6 +1,7 @@
-from random import random
+import random
 
 import numpy as np
+import data_management as dm
 from mathematic_functions import *
 
 class polska_gurom(object):
@@ -63,7 +64,9 @@ class polska_gurom(object):
                     prediction = 1 if output[0, 0] >= 0.5 else 0
                 else:
                     prediction = np.argmax(output)
-                    
+
+                if isinstance(y, np.ndarray):
+                    y = np.argmax(y) 
                 if prediction == y:
                     counter += 1
             except Exception as e:
@@ -98,25 +101,6 @@ class polska_gurom(object):
         self.weights = [w - (eta / len(mini_batch)) * nw for w, nw in zip(self.weights, nabla_w)]
         self.biases = [b - (eta / len(mini_batch)) * nb for b, nb in zip(self.biases, nabla_b)]
 
-    def batch_split(training_data: list, mini_batch_size: int = 10) -> list:
-        """
-        Shuffles the training data and splits it into mini-batches.
-
-        Parameters:
-        training_data (list): A list of tuples (x, y), where 'x' is the input column vector and 'y' is the desired output.
-        mini_batch_size (int): Number of examples per mini-batch (the last one may be smaller).
-
-        Returns:
-        list: A list of mini-batches, each a list of (x, y) tuples.
-        """
-
-        if mini_batch_size <= 0:
-            raise ValueError("mini_batch_size must be positive")
-
-        data = list(training_data)
-        random.shuffle(data)
-
-        return [data[k:k + mini_batch_size] for k in range(0, len(data), mini_batch_size)]
     
     def backprop(self, x: np.ndarray, y: np.ndarray) -> tuple[list[np.ndarray], list[np.ndarray]]:
         """
@@ -191,7 +175,7 @@ class polska_gurom(object):
         
         for i in range(epochs):
             
-            batches = self.batch_split(training_data, batch_size)    
+            batches = batch_split(training_data, batch_size)    
             for batch in batches:
                 self.update_mini_batch(batch, learning_rate)
             
@@ -199,3 +183,50 @@ class polska_gurom(object):
                 print(f"Epoch {i}: {self.result_test_data(test_data)} / {n_test}")
             else:
                 print(f"Epoch {i} completed")
+
+def batch_split(training_data: list, mini_batch_size: int = 10) -> list:
+        """
+        Shuffles the training data and splits it into mini-batches.
+
+        Parameters:
+        training_data (list): A list of tuples (x, y), where 'x' is the input column vector and 'y' is the desired output.
+        mini_batch_size (int): Number of examples per mini-batch (the last one may be smaller).
+
+        Returns:
+        list: A list of mini-batches, each a list of (x, y) tuples.
+        """
+
+        if mini_batch_size <= 0:
+            raise ValueError("mini_batch_size must be positive")
+
+        data = list(training_data)
+        random.shuffle(data)
+
+        return [data[k:k + mini_batch_size] for k in range(0, len(data), mini_batch_size)]
+
+def load_data(pictures: str, labels: str) -> list[tuple[np.ndarray, int]]:
+    """
+    Converts pictures and labels into a format suitable for the neural network.
+
+    Parameters:
+    pictures (str): Path to the folder containing the pictures.
+    labels (str): Path to the file containing the labels.
+
+    Returns:
+    list[tuple[np.ndarray, int]]: A list of tuples (x, y) where 'x' is the input vector and 'y' is the label.
+
+    Raises:
+    ValueError: If the lengths of pictures and labels do not match.
+    """
+    pictures = dm.pictures_load(pictures)
+    labels = dm.load_labels(labels)
+
+    if len(pictures) != len(labels):
+        raise ValueError("The number of pictures must match the number of labels")
+
+    data = []
+    for x, y in zip(pictures, labels):
+        vector = np.zeros((10, 1))
+        vector[y] = 1.0
+        data.append((x, vector))
+    return data
