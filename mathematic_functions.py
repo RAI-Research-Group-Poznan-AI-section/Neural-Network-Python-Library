@@ -47,3 +47,66 @@ def cost_function_derivative(output_activations: np.ndarray, y: np.ndarray) -> n
     Derivatives (np.ndarray)    
     """
     return (output_activations - y)
+
+class QuadraticCost:
+    
+    @staticmethod
+    def fn(output_activations: np.ndarray, y: np.ndarray) -> float:
+        """ 
+        Computes the raw cost value, not used in the calculations in the network, may be used to monitor the training process.
+        
+        Parameters:
+        output_activations (np.ndarray): Output of the output layer. Range [0,1]
+        y (np.ndarray): Correct output of the output layer. What it should look like. Range [0,1]
+        
+        Returns:
+        float: error value
+        """
+        return 0.5 * np.linalg.norm(output_activations - y)**2
+    
+    @staticmethod
+    def delta(z: np.ndarray, output_activations: np.ndarray, y: np.ndarray) -> np.ndarray:
+        """
+        Computes the derivative of the quadratic cost function
+    
+        Parameters:
+        z (np.ndarray): Weighted inputs of the output layer.
+        output_activations (np.ndarray): Output of the output layer. Range [0,1]
+        y (np.ndarray): Correct output of the output layer. What it should look like. Range [0,1]
+        
+        Returns:
+        Derivatives (np.ndarray)    
+        """
+        return (output_activations - y) * sigmoid_derivative(sigmoid_function(z))
+    
+class CrossEntropyCost:
+    
+    @staticmethod
+    def fn(output_activations: np.ndarray, y: np.ndarray) -> float:
+        """ 
+        Computes the raw cost value, not used in the calculations in the network, may be used to monitor the training process.
+        
+        Parameters:
+        output_activations (np.ndarray): Output of the output layer. Range [0,1]
+        y (np.ndarray): Correct output of the output layer. What it should look like. Range [0,1]
+        
+        Returns:
+        float: error value
+        """
+        return np.sum(np.nan_to_num(-y * np.log(output_activations) - (1 - y) * np.log(1 - output_activations)))
+    
+    @staticmethod
+    def delta(z: np.ndarray, output_activations: np.ndarray, y: np.ndarray) -> np.ndarray:
+        """
+        Computes the derivative of the cross entropy cost function
+    
+        Parameters:
+        z (np.ndarray): Weighted inputs of the output layer. It is not used here, just for the sake of generalization.
+        output_activations (np.ndarray): Output of the output layer. Range [0,1]
+        y (np.ndarray): Correct output of the output layer. What it should look like. Range [0,1]
+        
+        Returns:
+        Derivatives (np.ndarray)    
+        """
+        return (output_activations - y)
+    

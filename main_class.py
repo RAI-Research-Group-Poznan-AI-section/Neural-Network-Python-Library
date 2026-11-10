@@ -1,16 +1,20 @@
 import random
-
 import numpy as np
 import data_management as dm
+from typing import Literal
 from mathematic_functions import *
 
 class polska_gurom(object):
-    def __init__(self , sizes):
+    def __init__(self , sizes, cost: Literal["quadratic","cross_entropy"] = "cross_entropy"):
         self.num_layers = len(sizes)
         self.sizes = sizes
         self.biases = [np.random.randn(y, 1) for y in sizes[1:]]
         self.weights = [np.random.randn(y, x) for x, y in zip(sizes[:-1], sizes[1:])]
 
+        cost_dict = {"quadratic" : QuadraticCost, "cross_entropy" : CrossEntropyCost}
+        if cost not in cost_dict.keys(): raise ValueError(f"Unknown cost function: '{cost}'.")
+        self.cost = cost_dict[cost]
+        
     def feedforward(self, x:np.ndarray) -> np.ndarray:
         """
         Computes the feedforward pass of the neural network for a single input vector.
@@ -133,7 +137,7 @@ class polska_gurom(object):
             input = sigmoid_function(z)
             activations.append(input)
         
-        error = cost_function_derivative(activations[-1], y) * sigmoid_derivative(sigmoid_function(zs[-1]))
+        error = self.cost.delta(zs[-1], activations[-1], y)
         grad_b[-1] = error
         grad_w[-1] = np.dot(error, activations[-2].T)
         
