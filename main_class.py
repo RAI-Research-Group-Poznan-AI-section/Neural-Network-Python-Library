@@ -5,11 +5,17 @@ from typing import Literal
 from mathematic_functions import *
 
 class polska_gurom(object):
+<<<<<<< Updated upstream
     def __init__(self , sizes, cost: Literal["quadratic","cross_entropy"] = "cross_entropy"):
+=======
+    def __init__(self , sizes, dropout: bool = False):
+>>>>>>> Stashed changes
         self.num_layers = len(sizes)
         self.sizes = sizes
         self.biases = [np.random.randn(y, 1) for y in sizes[1:]]
         self.weights = [np.random.randn(y, x) for x, y in zip(sizes[:-1], sizes[1:])]
+        self.use_dropout = dropout
+        self.dropout_rate = 0.2 if self.use_dropout else 0.0
 
         cost_dict = {"quadratic" : QuadraticCost, "cross_entropy" : CrossEntropyCost}
         if cost not in cost_dict.keys(): raise ValueError(f"Unknown cost function: '{cost}'.")
@@ -129,12 +135,19 @@ class polska_gurom(object):
         
         input = x 
         activations = [x]
+        masks = []
         zs = []
         
-        for w, b in zip(self.weights, self.biases):
+        for i, (w, b) in enumerate(zip(self.weights, self.biases)):
             z = np.dot(w, input) + b
             zs.append(z)
             input = sigmoid_function(z)
+            if self.use_dropout and i < self.num_layers - 2:
+                input, mask = self.dropout(self.dropout_rate, input)
+                masks.append(mask)
+            else:
+                masks.append(np.ones_like(input))
+                
             activations.append(input)
         
         error = self.cost.delta(zs[-1], activations[-1], y)
@@ -143,6 +156,7 @@ class polska_gurom(object):
         
         for l in range(2, self.num_layers):
             error = np.dot(self.weights[-l+1].T, error) * sigmoid_derivative(sigmoid_function(zs[-l]))
+            error = error * masks[-l]
             grad_b[-l] = error
             grad_w[-l] = np.dot(error, activations[-l-1].T)
         
@@ -174,6 +188,7 @@ class polska_gurom(object):
         
         if test_data:
             n_test = len(test_data)
+<<<<<<< Updated upstream
         
         best_accuracy, stagnation_count = 0
         local_learning_rate = learning_rate
@@ -208,6 +223,51 @@ class polska_gurom(object):
                 print(f"Epoch {i} completed")
             
                 
+=======
+        n = len(training_data)
+        
+        for epoch in range(epochs):
+            batches = batch_split(training_data, batch_size)
+            for batch in batches:
+                self.update_mini_batch(batch, learning_rate)
+
+            if test_data:
+                correct = self.result_test_data(test_data)
+                accuracy = correct / n_test
+                details = f"correct={correct}/{n_test}, accuracy={accuracy:.2%}, batches={len(batches)}, learning_rate={learning_rate}"
+                print("\n" + "=" * 60)
+                print(f"Epoch {epoch + 1}/{epochs}")
+                print(f"Training samples: {n}")
+                print(f"Batch count: {len(batches)}")
+                print(f"Learning rate: {learning_rate}")
+                print(f"Test result: {correct}/{n_test} ({accuracy:.2%})")
+                print("=" * 60)
+            else:
+                details = f"completed, batches={len(batches)}, learning_rate={learning_rate}"
+                print("\n" + "=" * 60)
+                print(f"Epoch {epoch + 1}/{epochs}")
+                print(f"Training samples: {n}")
+                print(f"Batch count: {len(batches)}")
+                print(f"Learning rate: {learning_rate}")
+                print("Epoch completed successfully")
+                print("=" * 60)
+
+            dm.save_training_log(epoch + 1, details)
+
+    def ReLU_F(self, z):
+        return np.maximum(0, z)
+
+    def ReLU_B(self, z, gradient):
+        dx = gradient.copy()
+        dx[z <= 0] = 0
+        return dx
+
+    def dropout(self, bounce_rate, neurons):
+        prob = 1.0 - bounce_rate 
+        mask = (np.random.rand(*neurons.shape) < prob).astype(float) / prob
+        output = neurons * mask
+        return output, mask
+>>>>>>> Stashed changes
 
 def batch_split(training_data: list, mini_batch_size: int = 10) -> list:
         """

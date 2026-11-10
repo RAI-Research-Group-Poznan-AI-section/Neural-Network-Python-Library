@@ -1,70 +1,272 @@
-import os
+import random
+
 import numpy as np
-from PIL import Image
+import data_management as dm
+from mathematic_functions import *
 
+class polska_gurom(object):
+    def __init__(self , sizes, dropout: bool = False):
+        self.num_layers = len(sizes)
+        self.sizes = sizes
+        self.biases = [np.random.randn(y, 1) for y in sizes[1:]]
+        self.weights = [np.random.randn(y, x) for x, y in zip(sizes[:-1], sizes[1:])]
+        self.use_dropout = dropout
+        self.dropout_rate = 0.2 if self.use_dropout else 0.0
 
-def load_labels(labels_path: str, num_of_numbers: int = 10) -> list[int]:
+    def feedforward(self, x:np.ndarray) -> np.ndarray:
+        """
+        Computes the feedforward pass of the neural network for a single input vector.
+
+        Parameters:
+        x (numpy.ndarray): The input column vector of shape (sizes[0], 1).
+
+        Returns:
+        numpy.ndarray: The output vector of the network from the final layer.
+
+        Raises:
+        ValueError: If the input 'x' does not match the expected input layer dimensions.
+        """
+        if x.shape != (self.sizes[0], 1):
+            raise ValueError(f"Input vector 'x' must have shape ({self.sizes[0]}, 1), but got {x.shape}")
+
+        input = x
+        for i in range(len(self.weights)):
+            w = self.weights[i]
+            b = self.biases[i]
+            z = (w @ input) + b
+            input = sigmoid_function(z)
+            
+        return input
+
+    def result_test_data(self, data) -> int:
+        """
+        Evaluates the neural network on a test dataset and returns the number of correct predictions.
+
+        Parameters:
+        data (iterable): An iterable collection of tuples (x, y) where 'x' is the input vector 
+                         and 'y' is the true label/target value.
+
+        Returns:
+        int: The total count of correct predictions.
+
+        Raises:
+        ValueError: If the provided dataset is empty or None.
+        RuntimeError: If an error occurs during inference or sample processing.
+        """
+        if data is None or len(data) == 0:
+            raise ValueError("Data cannot be empty.")
+            
+        counter = 0
+        is_binary = self.sizes[-1] == 1
+        
+        for x, y in data:
+            try:
+                output = self.feedforward(x)
+                if is_binary:
+                    prediction = 1 if output[0, 0] >= 0.5 else 0
+                else:
+                    prediction = np.argmax(output)
+
+                if isinstance(y, np.ndarray):
+                    y = np.argmax(y) 
+                if prediction == y:
+                    counter += 1
+            except Exception as e:
+                raise RuntimeError(f"Error processing test sample: {e}")
+                
+        return counter
+
+    def update_mini_batch(self, mini_batch: list, eta: float) -> tuple:
+        """
+        Updates the network's weights and biases by applying gradient descent
+        using backpropagation to a single mini-batch.
+
+        Parameters:
+        mini_batch (list): A list of tuples (x, y), where 'x' is the input column vector and 'y' is the desired output.
+        eta (float): The learning rate.
+
+        Returns:
+        tuple: Updated weights and biases after applying gradient descent.
+        """
+
+        # Initialize gradients for weights and biases
+        nabla_w = [np.zeros(w.shape) for w in self.weights]
+        nabla_b = [np.zeros(b.shape) for b in self.biases]
+
+        # Perform backpropagation for each example in the mini-batch
+        for x, y in mini_batch:
+            delta_nabla_b, delta_nabla_w = self.backprop(x, y)
+            nabla_w = [nw + dnw for nw, dnw in zip(nabla_w, delta_nabla_w)]
+            nabla_b = [nb + dnb for nb, dnb in zip(nabla_b, delta_nabla_b)]
+
+        # Update weights and biases using the average gradients
+        self.weights = [w - (eta / len(mini_batch)) * nw for w, nw in zip(self.weights, nabla_w)]
+        self.biases = [b - (eta / len(mini_batch)) * nb for b, nb in zip(self.biases, nabla_b)]
+
+    
+    def backprop(self, x: np.ndarray, y: np.ndarray) -> tuple[list[np.ndarray], list[np.ndarray]]:
+        """
+        Parameters:
+        x (np.ndarray) - An array of the activations for the input of the network
+        y (np.ndarray) - An array with outputs for x
+        
+        Returns: 
+        tuple: A tuple containing two lists of np.ndarray, the gradients.
+        
+        Raises:
+        ValueError: If the input 'x' or 'y' does not match the expected input layer dimensions.
+        """
+        
+        if x.shape != (self.sizes[0], 1):
+            raise ValueError(f"Input 'x' must have shape ({self.sizes[0]}, 1), got {x.shape}")
+        if y.shape != (self.sizes[-1], 1):
+            raise ValueError(f"Target 'y' must have shape ({self.sizes[-1]}, 1), got {y.shape}")
+        
+        grad_w = [np.zeros(w.shape) for w in self.weights]
+        grad_b = [np.zeros(b.shape) for b in self.biases]
+        
+        input = x 
+        activations = [x]
+        masks = []
+        zs = []
+        
+        for i, (w, b) in enumerate(zip(self.weights, self.biases)):
+            z = np.dot(w, input) + b
+            zs.append(z)
+            input = sigmoid_function(z)
+            if self.use_dropout and i < self.num_layers - 2:
+                input, mask = self.dropout(self.dropout_rate, input)
+                masks.append(mask)
+            else:
+                masks.append(np.ones_like(input))
+                
+            activations.append(input)
+        
+        error = cost_function_derivative(activations[-1], y) * sigmoid_derivative(sigmoid_function(zs[-1]))
+        grad_b[-1] = error
+        grad_w[-1] = np.dot(error, activations[-2].T)
+        
+        for l in range(2, self.num_layers):
+            error = np.dot(self.weights[-l+1].T, error) * sigmoid_derivative(sigmoid_function(zs[-l]))
+            error = error * masks[-l]
+            grad_b[-l] = error
+            grad_w[-l] = np.dot(error, activations[-l-1].T)
+        
+        return (grad_b, grad_w)
+
+    def train(self, training_data: list[tuple[np.ndarray,np.ndarray]], epochs: int, batch_size: int, learning_rate: float, test_data: list[tuple[np.ndarray, int]] = None):
+        """
+
+        Parameters:
+            training_data (list[tuple[np.ndarray,np.ndarray]]): A list of tuples (x, y), where 'x' is the input column vector and 'y' is the desired output.
+            epochs (int): Number of epochs for how long the training must go.
+            batch_size (int): Size of the mini batches.
+            learning_rate (float): Learning rate
+            test_data (list[tuple[np.ndarray, int]], optional): A list of tuples (x, y), where 'x' is the input column vector and 'y' is the desired output.
+            It is used to compare the training results with the correct ones. Using it slows down the algorithm. Defaults to None.
+        
+        Raises:
+            ValueError: If the input 'training_data' is empty.
+            ValueError: If the number of epochs is less or equal than 0.
+            ValueError: If the value of the learning rate is less than zero.
+        """
+        
+        if not training_data:
+            raise ValueError("Training Data shouldn't be empty")
+        if epochs <= 0:
+            raise ValueError(f"Epochs must be an integer greater than 0, got {epochs}")
+        if learning_rate <= 0:
+            raise ValueError(f"Learning rate must be greater than 0, got {learning_rate}")
+        
+        if test_data:
+            n_test = len(test_data)
+        n = len(training_data)
+        
+        for epoch in range(epochs):
+            batches = batch_split(training_data, batch_size)
+            for batch in batches:
+                self.update_mini_batch(batch, learning_rate)
+
+            if test_data:
+                correct = self.result_test_data(test_data)
+                accuracy = correct / n_test
+                details = f"correct={correct}/{n_test}, accuracy={accuracy:.2%}, batches={len(batches)}, learning_rate={learning_rate}"
+                print("\n" + "=" * 60)
+                print(f"Epoch {epoch + 1}/{epochs}")
+                print(f"Training samples: {n}")
+                print(f"Batch count: {len(batches)}")
+                print(f"Learning rate: {learning_rate}")
+                print(f"Test result: {correct}/{n_test} ({accuracy:.2%})")
+                print("=" * 60)
+            else:
+                details = f"completed, batches={len(batches)}, learning_rate={learning_rate}"
+                print("\n" + "=" * 60)
+                print(f"Epoch {epoch + 1}/{epochs}")
+                print(f"Training samples: {n}")
+                print(f"Batch count: {len(batches)}")
+                print(f"Learning rate: {learning_rate}")
+                print("Epoch completed successfully")
+                print("=" * 60)
+
+            dm.save_training_log(epoch + 1, details)
+
+    def ReLU_F(self, z):
+        return np.maximum(0, z)
+
+    def ReLU_B(self, z, gradient):
+        dx = gradient.copy()
+        dx[z <= 0] = 0
+        return dx
+
+    def dropout(self, bounce_rate, neurons):
+        prob = 1.0 - bounce_rate 
+        mask = (np.random.rand(*neurons.shape) < prob).astype(float) / prob
+        output = neurons * mask
+        return output, mask
+
+def batch_split(training_data: list, mini_batch_size: int = 10) -> list:
+        """
+        Shuffles the training data and splits it into mini-batches.
+
+        Parameters:
+        training_data (list): A list of tuples (x, y), where 'x' is the input column vector and 'y' is the desired output.
+        mini_batch_size (int): Number of examples per mini-batch (the last one may be smaller).
+
+        Returns:
+        list: A list of mini-batches, each a list of (x, y) tuples.
+        """
+
+        if mini_batch_size <= 0:
+            raise ValueError("mini_batch_size must be positive")
+
+        data = list(training_data)
+        random.shuffle(data)
+
+        return [data[k:k + mini_batch_size] for k in range(0, len(data), mini_batch_size)]
+
+def load_data(pictures: str, labels: str) -> list[tuple[np.ndarray, int]]:
     """
-    Reads labels from a file, in order.
-
-    Supported formats:
-    .npy: a numpy array.
-    any text file: the format of labels either has to be a single column of labels or a header row followed by a single column of labels.
+    Converts pictures and labels into a format suitable for the neural network.
 
     Parameters:
-    labels_path (str): The labels file.
-    num_of_numbers (int): The number of different labels (e.g. 10 for digits 0-9).
+    pictures (str): Path to the folder containing the pictures.
+    labels (str): Path to the file containing the labels.
 
     Returns:
-    list[int]: The labels as ints.
+    list[tuple[np.ndarray, int]]: A list of tuples (x, y) where 'x' is the input vector and 'y' is the label.
 
     Raises:
-    ValueError: If a label is not a digit 0 to 9.
+    ValueError: If the lengths of pictures and labels do not match.
     """
-    if os.path.splitext(labels_path)[1].lower() == ".npy":
-        raw_labels = [str(v) for v in np.load(labels_path).ravel()]
-    else:
-        with open(labels_path, encoding="utf-8-sig") as f:
-            raw_labels = f.read().split()
-        if raw_labels and raw_labels[0].isalpha():
-            raw_labels = raw_labels[1:]
+    pictures = dm.pictures_load(pictures)
+    labels = dm.load_labels(labels)
 
-    labels = []
-    for i, value in enumerate(raw_labels):
-        if value not in [str(d) for d in range(num_of_numbers)]:
-            raise ValueError(f"Label {i} in '{labels_path}' must be a digit 0 to {num_of_numbers - 1}, got '{value}'")
-        labels.append(int(value))
-    return labels
+    if len(pictures) != len(labels):
+        raise ValueError("The number of pictures must match the number of labels")
 
-
-def pictures_load(picture_path: str) -> list[np.ndarray]:
-    """
-    Loads every grayscale picture in a folder as a column vector, in file name order.
-
-    Parameters:
-    picture_path (str): Folder with the pictures.
-
-    Returns:
-    list[np.ndarray]: The pictures as numpy arrays of shape (width * height, 1) with values in [0, 1] for sigmoid activation.
-
-    Raises:
-    ValueError: If the path is not a folder, it has no pictures.
-    For now it only supports grayscale images as there is no need for color images in this project.
-    """
-    if not os.path.isdir(picture_path):
-        raise ValueError(f"'{picture_path}' is not a folder")
-
-    pictures = []
-    for filename in sorted(os.listdir(picture_path)):
-        if filename.lower().endswith((".png", ".jpg", ".jpeg", ".bmp")):
-            img = Image.open(os.path.join(picture_path, filename))
-            if img.mode != "L":
-                # for now it only supports grayscale images as there is no need for color images in this project
-                raise ValueError(f"Picture '{filename}' must be grayscale, got mode '{img.mode}'") 
-            pictures.append(np.asarray(img, dtype=np.float64).reshape(-1, 1) / 255)  # normalize to [0, 1]
-
-    if not pictures:
-        raise ValueError(f"No pictures found in '{picture_path}'")
-    return pictures
-
-
+    data = []
+    for x, y in zip(pictures, labels):
+        vector = np.zeros((10, 1))
+        vector[y] = 1.0
+        data.append((x, vector))
+    return data
