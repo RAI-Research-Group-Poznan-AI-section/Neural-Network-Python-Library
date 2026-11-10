@@ -174,19 +174,40 @@ class polska_gurom(object):
         
         if test_data:
             n_test = len(test_data)
-        n = len(training_data)
         
-        
+        best_accuracy, stagnation_count = 0
+        local_learning_rate = learning_rate
         for i in range(epochs):
             
             batches = batch_split(training_data, batch_size)    
             for batch in batches:
-                self.update_mini_batch(batch, learning_rate)
+                self.update_mini_batch(batch, local_learning_rate)
             
             if test_data:
-                print(f"Epoch {i}: {self.result_test_data(test_data)} / {n_test}")
+                accuracy = self.result_test_data(test_data) / n_test
+                
+                print(f"Epoch {i}: {accuracy}")
+                
+                if accuracy > best_accuracy:
+                    best_accuracy = accuracy
+                    stagnation_count = 0
+                else:
+                    stagnation_count += 1
+                    
+                    if stagnation_count == 5:
+                        local_learning_rate /= 2
+                        print(f"Decreasing the learning rate to {local_learning_rate}.")
+                        stagnation_count = 0
+                        
+                        
+                if learning_rate / 128 >= local_learning_rate:
+                    print("Learning rate dropped below 128th of the original. Terminating the training process.")
+                    return
+                
             else:
                 print(f"Epoch {i} completed")
+            
+                
 
 def batch_split(training_data: list, mini_batch_size: int = 10) -> list:
         """
